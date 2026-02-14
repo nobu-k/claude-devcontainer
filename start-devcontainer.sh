@@ -4,6 +4,9 @@ set -euo pipefail
 CONTAINER_NAME="${CONTAINER_NAME:-claude-dev}"
 IMAGE_NAME="${IMAGE_NAME:-claude-devcontainer}"
 
+# cd to repo root: bazel run sets BUILD_WORKSPACE_DIRECTORY, otherwise use script dir
+cd "${BUILD_WORKSPACE_DIRECTORY:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+
 # Auto-detect UID/GID and Docker socket GID
 HOST_UID="$(id -u)"
 HOST_GID="$(id -g)"
@@ -14,7 +17,6 @@ else
     DOCKER_GID=984
 fi
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEV_HOME="/home/dev"
 
 # Always build (layer cache makes this fast when nothing changes)
@@ -23,7 +25,7 @@ docker build \
     --build-arg USER_GID="$HOST_GID" \
     --build-arg DOCKER_GID="$DOCKER_GID" \
     -t "$IMAGE_NAME" \
-    "$SCRIPT_DIR"
+    .
 
 # Remove pre-existing container with the same name
 docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
@@ -87,10 +89,12 @@ if [ -n "${SSH_AUTH_SOCK:-}" ]; then
 fi
 
 # exec for proper signal forwarding; "$@" pass-through defaults to CMD (claude)
+docker_run_args=(--rm -i --name "$CONTAINER_NAME")
+if [ -t 0 ]; then
+    docker_run_args+=(-t)
+fi
 exec docker run \
-    --rm \
-    -it \
-    --name "$CONTAINER_NAME" \
+    "${docker_run_args[@]}" \
     "${mounts[@]}" \
     "${env_args[@]}" \
     "$IMAGE_NAME" \
