@@ -56,10 +56,6 @@ RUN groupadd --gid ${USER_GID} ${USER_NAME} \
     && groupadd --gid ${DOCKER_GID} docker-host \
     && usermod -aG docker-host ${USER_NAME}
 
-# Bazel jj-workspace sharing
-RUN echo 'startup --output_base=/home/'"${USER_NAME}"'/.cache/bazel/output_base' \
-        > /etc/bazel.bazelrc
-
 # Environment
 ENV CARGO_HOME=/home/${USER_NAME}/.cargo \
     RUSTUP_HOME=/home/${USER_NAME}/.rustup \
@@ -72,7 +68,6 @@ ENV PATH="${CARGO_HOME}/bin:${GOROOT}/bin:${GOPATH}/bin:${PATH}"
 
 # Pre-create mount target directories
 RUN mkdir -p \
-        /home/${USER_NAME}/.cache/bazel \
         /home/${USER_NAME}/.cache/bazelisk \
         /home/${USER_NAME}/.cache/pnpm \
         /home/${USER_NAME}/.cargo \

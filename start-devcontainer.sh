@@ -28,10 +28,10 @@ docker build \
 # Remove pre-existing container with the same name
 docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
 
-# Build mount arguments
+# Build mount and env arguments
+env_args=()
 mounts=(
     -v "$(pwd):/workspace"
-    -v "$HOME/.cache/bazel:${DEV_HOME}/.cache/bazel"
     -v "$HOME/.cache/bazelisk:${DEV_HOME}/.cache/bazelisk:ro"
     -v "$HOME/.cargo:${DEV_HOME}/.cargo:ro"
     -v "$HOME/.rustup:${DEV_HOME}/.rustup:ro"
@@ -41,6 +41,17 @@ mounts=(
     -v "$HOME/.cache/pnpm:${DEV_HOME}/.cache/pnpm:ro"
     -v "$HOME/.claude:${DEV_HOME}/.claude"
 )
+
+# Bazel output base (only if repo is configured with Bazel)
+if [ -f "$(pwd)/MODULE.bazel" ]; then
+    HOST_BAZEL_OUTPUT_BASE="$(bazel info output_base)"
+    BAZEL_RC="$(mktemp)"
+    printf 'startup --output_base=%s\n' "$HOST_BAZEL_OUTPUT_BASE" > "$BAZEL_RC"
+    mounts+=(
+        -v "$HOST_BAZEL_OUTPUT_BASE:$HOST_BAZEL_OUTPUT_BASE"
+        -v "$BAZEL_RC:/etc/bazel.bazelrc:ro"
+    )
+fi
 
 # Docker socket
 if [ -S "$DOCKER_SOCK" ]; then
@@ -61,7 +72,6 @@ if [ -d "$HOME/.ssh" ]; then
 fi
 
 # SSH agent forwarding
-env_args=()
 if [ -n "${SSH_AUTH_SOCK:-}" ]; then
     mounts+=(-v "$SSH_AUTH_SOCK:/tmp/ssh-agent.sock")
     env_args+=(-e SSH_AUTH_SOCK=/tmp/ssh-agent.sock)
