@@ -28,6 +28,14 @@ docker build \
 # Remove pre-existing container with the same name
 docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
 
+# Ensure /workspace is trusted in Claude config (container always uses this path)
+if [ -f "$HOME/.claude.json" ]; then
+    jq '.projects["/workspace"].hasTrustDialogAccepted = true
+        | .projects["/workspace"].hasCompletedProjectOnboarding = true' \
+        "$HOME/.claude.json" > "$HOME/.claude.json.tmp" \
+        && mv "$HOME/.claude.json.tmp" "$HOME/.claude.json"
+fi
+
 # Build mount and env arguments
 env_args=()
 mounts=(
@@ -40,6 +48,7 @@ mounts=(
     -v "$HOME/.npm:${DEV_HOME}/.npm:ro"
     -v "$HOME/.cache/pnpm:${DEV_HOME}/.cache/pnpm:ro"
     -v "$HOME/.claude:${DEV_HOME}/.claude"
+    -v "$HOME/.claude.json:${DEV_HOME}/.claude.json"
 )
 
 # Bazel output base (only if repo is configured with Bazel)
