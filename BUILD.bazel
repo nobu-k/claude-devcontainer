@@ -1,10 +1,12 @@
-load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
+load("//:defs.bzl", "devcontainer")
 
-sh_binary(
-    name = "start",
-    srcs = ["start-devcontainer.sh"],
-    data = [
+exports_files(
+    [
+        "start-devcontainer.sh",
         "Dockerfile",
         ".dockerignore",
     ],
+    visibility = ["//visibility:public"],
 )
+
+devcontainer(name = "start")

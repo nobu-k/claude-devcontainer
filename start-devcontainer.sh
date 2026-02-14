@@ -4,8 +4,10 @@ set -euo pipefail
 CONTAINER_NAME="${CONTAINER_NAME:-claude-dev}"
 IMAGE_NAME="${IMAGE_NAME:-claude-devcontainer}"
 
-# cd to repo root: bazel run sets BUILD_WORKSPACE_DIRECTORY, otherwise use script dir
-cd "${BUILD_WORKSPACE_DIRECTORY:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+# Docker context: where Dockerfile lives (works for both direct invocation and Bazel runfiles)
+DOCKER_CONTEXT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Workspace: what gets mounted as /workspace (caller's repo when run via bazel run)
+WORKSPACE_DIR="${BUILD_WORKSPACE_DIRECTORY:-$DOCKER_CONTEXT}"
 
 # Auto-detect UID/GID and Docker socket GID
 HOST_UID="$(id -u)"
@@ -25,7 +27,7 @@ docker build \
     --build-arg USER_GID="$HOST_GID" \
     --build-arg DOCKER_GID="$DOCKER_GID" \
     -t "$IMAGE_NAME" \
-    .
+    "$DOCKER_CONTEXT"
 
 # Remove pre-existing container with the same name
 docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
@@ -41,7 +43,7 @@ fi
 # Build mount and env arguments
 env_args=()
 mounts=(
-    -v "$(pwd):/workspace"
+    -v "$WORKSPACE_DIR:/workspace"
     -v "$HOME/.cache/bazelisk:${DEV_HOME}/.cache/bazelisk:ro"
     -v "$HOME/.cargo:${DEV_HOME}/.cargo:ro"
     -v "$HOME/.rustup:${DEV_HOME}/.rustup:ro"
@@ -54,8 +56,8 @@ mounts=(
 )
 
 # Bazel output base (only if repo is configured with Bazel)
-if [ -f "$(pwd)/MODULE.bazel" ]; then
-    HOST_BAZEL_OUTPUT_BASE="$(bazel info output_base)"
+if [ -f "$WORKSPACE_DIR/MODULE.bazel" ]; then
+    HOST_BAZEL_OUTPUT_BASE="$(cd "$WORKSPACE_DIR" && bazel info output_base)"
     BAZEL_RC="$(mktemp)"
     printf 'startup --output_base=%s\n' "$HOST_BAZEL_OUTPUT_BASE" > "$BAZEL_RC"
     mounts+=(
