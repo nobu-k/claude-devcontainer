@@ -11,6 +11,13 @@ WORKSPACE_DIR="${BUILD_WORKSPACE_DIRECTORY:-$DOCKER_CONTEXT}"
 
 # Create worktree/workspace for VCS isolation
 VCS="${DEVCONTAINER_VCS:-}"
+if [ -z "$VCS" ]; then
+    if [ -d "$WORKSPACE_DIR/.jj" ]; then
+        VCS="jj"
+    elif [ -d "$WORKSPACE_DIR/.git" ]; then
+        VCS="git"
+    fi
+fi
 WORKTREE_DIR=""
 if [ -n "$VCS" ]; then
     WORKTREE_DIR="$(mktemp -d "/tmp/devcontainer-XXXXXX")"

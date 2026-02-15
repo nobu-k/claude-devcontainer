@@ -8,7 +8,7 @@ def devcontainer(name = "devcontainer", vcs = "", **kwargs):
     Args:
         name: Target name.
         vcs: Version control system for worktree isolation ("git" or "jj").
-             Empty string (default) mounts the repo directly.
+             Empty string (default) auto-detects from .jj/ or .git/ in the workspace.
         **kwargs: Additional arguments passed to sh_binary.
     """
     env = dict(kwargs.pop("env", {}))
