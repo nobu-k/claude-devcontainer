@@ -15,6 +15,7 @@ WORKTREE_DIR=""
 if [ -n "$VCS" ]; then
     WORKTREE_DIR="$(mktemp -d "/tmp/devcontainer-XXXXXX")"
     rmdir "$WORKTREE_DIR"  # git/jj will create it
+    CONTAINER_NAME="devcontainer-$(basename "$WORKTREE_DIR")"
 
     case "$VCS" in
         git)
