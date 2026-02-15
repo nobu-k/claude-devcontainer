@@ -124,6 +124,18 @@ if [ -n "${SSH_AUTH_SOCK:-}" ]; then
     env_args+=(-e SSH_AUTH_SOCK=/tmp/ssh-agent.sock)
 fi
 
+# Worktree VCS backend: mount the original repo's VCS directory so pointer files resolve
+if [ -n "${WORKTREE_DIR:-}" ]; then
+    case "$VCS" in
+        git)
+            mounts+=(-v "$ORIGINAL_WORKSPACE/.git:$ORIGINAL_WORKSPACE/.git")
+            ;;
+        jj)
+            mounts+=(-v "$ORIGINAL_WORKSPACE/.jj/repo:$ORIGINAL_WORKSPACE/.jj/repo")
+            ;;
+    esac
+fi
+
 cleanup() {
     if [ -z "${WORKTREE_DIR:-}" ]; then return; fi
     case "$VCS" in
