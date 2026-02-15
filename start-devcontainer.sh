@@ -9,6 +9,32 @@ DOCKER_CONTEXT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Workspace: what gets mounted as /workspace (caller's repo when run via bazel run)
 WORKSPACE_DIR="${BUILD_WORKSPACE_DIRECTORY:-$DOCKER_CONTEXT}"
 
+# Create worktree/workspace for VCS isolation
+VCS="${DEVCONTAINER_VCS:-}"
+WORKTREE_DIR=""
+if [ -n "$VCS" ]; then
+    WORKTREE_DIR="$(mktemp -d "/tmp/devcontainer-XXXXXX")"
+    rmdir "$WORKTREE_DIR"  # git/jj will create it
+
+    case "$VCS" in
+        git)
+            BRANCH_NAME="devcontainer-$(basename "$WORKTREE_DIR")"
+            git -C "$WORKSPACE_DIR" worktree add -b "$BRANCH_NAME" "$WORKTREE_DIR"
+            ;;
+        jj)
+            WORKTREE_NAME="devcontainer-$(basename "$WORKTREE_DIR")"
+            jj -R "$WORKSPACE_DIR" workspace add --name "$WORKTREE_NAME" "$WORKTREE_DIR"
+            ;;
+        *)
+            echo "Unknown VCS type: $VCS (expected 'git' or 'jj')" >&2
+            exit 1
+            ;;
+    esac
+
+    ORIGINAL_WORKSPACE="$WORKSPACE_DIR"
+    WORKSPACE_DIR="$WORKTREE_DIR"
+fi
+
 # Auto-detect UID/GID and Docker socket GID
 HOST_UID="$(id -u)"
 HOST_GID="$(id -g)"
@@ -90,14 +116,42 @@ if [ -n "${SSH_AUTH_SOCK:-}" ]; then
     env_args+=(-e SSH_AUTH_SOCK=/tmp/ssh-agent.sock)
 fi
 
-# exec for proper signal forwarding; "$@" pass-through defaults to CMD (claude)
+cleanup() {
+    if [ -z "${WORKTREE_DIR:-}" ]; then return; fi
+    case "$VCS" in
+        git)
+            git -C "$ORIGINAL_WORKSPACE" worktree remove --force "$WORKTREE_DIR" 2>/dev/null || true
+            # Delete the branch only if it was fully merged (no unmerged commits)
+            if git -C "$ORIGINAL_WORKSPACE" merge-base --is-ancestor "$BRANCH_NAME" HEAD 2>/dev/null; then
+                git -C "$ORIGINAL_WORKSPACE" branch -d "$BRANCH_NAME" 2>/dev/null || true
+            fi
+            ;;
+        jj)
+            jj -R "$ORIGINAL_WORKSPACE" workspace forget "$WORKTREE_NAME" 2>/dev/null || true
+            rm -rf "$WORKTREE_DIR"
+            ;;
+    esac
+}
+
+# "$@" pass-through defaults to CMD (claude)
 docker_run_args=(--rm -i --name "$CONTAINER_NAME")
 if [ -t 0 ]; then
     docker_run_args+=(-t)
 fi
-exec docker run \
-    "${docker_run_args[@]}" \
-    "${mounts[@]}" \
-    "${env_args[@]}" \
-    "$IMAGE_NAME" \
-    "$@"
+if [ -n "${WORKTREE_DIR:-}" ]; then
+    trap cleanup EXIT
+    docker run \
+        "${docker_run_args[@]}" \
+        "${mounts[@]}" \
+        "${env_args[@]}" \
+        "$IMAGE_NAME" \
+        "$@"
+else
+    # exec for proper signal forwarding when no cleanup is needed
+    exec docker run \
+        "${docker_run_args[@]}" \
+        "${mounts[@]}" \
+        "${env_args[@]}" \
+        "$IMAGE_NAME" \
+        "$@"
+fi

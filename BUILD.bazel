@@ -9,4 +9,4 @@ exports_files(
     visibility = ["//visibility:public"],
 )
 
-devcontainer(name = "start")
+devcontainer(name = "start", vcs = "jj")
