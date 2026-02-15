@@ -6,8 +6,8 @@ IMAGE_NAME="${IMAGE_NAME:-claude-devcontainer}"
 
 # Docker context: where Dockerfile lives (works for both direct invocation and Bazel runfiles)
 DOCKER_CONTEXT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# Workspace: what gets mounted as /workspace (caller's repo when run via bazel run)
-WORKSPACE_DIR="${BUILD_WORKSPACE_DIRECTORY:-$DOCKER_CONTEXT}"
+# Workspace: what gets mounted as /workspace (caller's repo when run via bazel run, otherwise cwd)
+WORKSPACE_DIR="${BUILD_WORKSPACE_DIRECTORY:-$PWD}"
 
 # Create worktree/workspace for VCS isolation
 VCS="${DEVCONTAINER_VCS:-}"
