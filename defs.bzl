@@ -5,6 +5,8 @@ def _devcontainer_impl(ctx):
     args = []
     if ctx.attr.docker:
         args.append("--docker")
+    for port in ctx.attr.ports:
+        args.extend(["--port", port])
 
     ctx.actions.write(
         output = script,
@@ -27,6 +29,10 @@ devcontainer = rule(
         "docker": attr.bool(
             default = False,
             doc = "Mount the Docker socket into the container.",
+        ),
+        "ports": attr.string_list(
+            default = [],
+            doc = "Port mappings to publish (hostPort:containerPort).",
         ),
         "_binary": attr.label(
             default = Label("//:devcontainer"),

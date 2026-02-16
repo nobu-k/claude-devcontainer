@@ -38,6 +38,7 @@ func main() {
 	var flagName string
 	var flagVCS string
 	var flagDocker bool
+	var flagPorts []string
 
 	rootCmd := &cobra.Command{
 		Use:   "devcontainer [flags] [-- command...]",
@@ -49,13 +50,14 @@ func main() {
 		SilenceUsage:       true,
 		SilenceErrors:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(flagName, flagVCS, flagDocker, args)
+			return run(flagName, flagVCS, flagDocker, flagPorts, args)
 		},
 	}
 
 	rootCmd.Flags().StringVar(&flagName, "name", "", "name for worktree/container (default: random suffix)")
 	rootCmd.Flags().StringVar(&flagVCS, "vcs", "", "override VCS type: git or jj (default: auto-detect)")
 	rootCmd.Flags().BoolVar(&flagDocker, "docker", false, "mount Docker socket into the container")
+	rootCmd.Flags().StringArrayVar(&flagPorts, "port", nil, "publish a container port to the host (hostPort:containerPort)")
 
 	if err := rootCmd.Execute(); err != nil {
 		var ec exitCodeError
@@ -67,7 +69,21 @@ func main() {
 	}
 }
 
-func run(name, vcsFlag string, docker bool, extraArgs []string) error {
+func run(name, vcsFlag string, docker bool, ports []string, extraArgs []string) error {
+	// Validate port mappings
+	for _, p := range ports {
+		parts := strings.SplitN(p, ":", 2)
+		if len(parts) != 2 {
+			return fmt.Errorf("invalid port format %q: expected hostPort:containerPort", p)
+		}
+		if _, err := strconv.Atoi(parts[0]); err != nil {
+			return fmt.Errorf("invalid host port in %q: %w", p, err)
+		}
+		if _, err := strconv.Atoi(parts[1]); err != nil {
+			return fmt.Errorf("invalid container port in %q: %w", p, err)
+		}
+	}
+
 	containerName := envOrDefault("CONTAINER_NAME", "claude-dev")
 	imageName := envOrDefault("IMAGE_NAME", "claude-devcontainer")
 
@@ -302,6 +318,9 @@ func run(name, vcsFlag string, docker bool, extraArgs []string) error {
 
 	dockerArgs = append(dockerArgs, mounts...)
 	dockerArgs = append(dockerArgs, envArgs...)
+	for _, p := range ports {
+		dockerArgs = append(dockerArgs, "-p", p)
+	}
 	dockerArgs = append(dockerArgs, imageName)
 	dockerArgs = append(dockerArgs, extraArgs...)
 
