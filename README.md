@@ -110,6 +110,7 @@ Then create a target in your `BUILD.bazel`:
 load("@claude-devcontainer//:defs.bzl", "devcontainer")
 
 devcontainer(name = "start")
+devcontainer(name = "attach", command = "exec")
 ```
 
 Run it:
@@ -118,6 +119,10 @@ Run it:
 bazel run //:start
 bazel run //:start -- --name my-session
 bazel run //:start -- -- echo Hello
+
+# Attach to a running devcontainer
+bazel run //:attach
+bazel run //:attach -- my-feature
 ```
 
 When invoked via `bazel run`, the tool automatically uses `BUILD_WORKSPACE_DIRECTORY` as the workspace root.

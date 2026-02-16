@@ -10,8 +10,9 @@ def _devcontainer_impl(ctx):
 
     ctx.actions.write(
         output = script,
-        content = '#!/bin/bash\nexec "{}" start {} "$@"\n'.format(
+        content = '#!/bin/bash\nexec "{}" {} {} "$@"\n'.format(
             ctx.executable._binary.short_path,
+            ctx.attr.command,
             " ".join(args),
         ),
         is_executable = True,
@@ -26,6 +27,11 @@ devcontainer = rule(
     implementation = _devcontainer_impl,
     doc = "Creates a runnable target that launches the Claude devcontainer.",
     attrs = {
+        "command": attr.string(
+            default = "start",
+            doc = "Subcommand to run (start or exec).",
+            values = ["start", "exec"],
+        ),
         "docker": attr.bool(
             default = False,
             doc = "Mount the Docker socket into the container.",
