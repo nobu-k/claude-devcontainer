@@ -37,6 +37,7 @@ func (e exitCodeError) Error() string {
 func main() {
 	var flagName string
 	var flagVCS string
+	var flagDocker bool
 
 	rootCmd := &cobra.Command{
 		Use:   "devcontainer [flags] [-- command...]",
@@ -48,12 +49,13 @@ func main() {
 		SilenceUsage:       true,
 		SilenceErrors:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(flagName, flagVCS, args)
+			return run(flagName, flagVCS, flagDocker, args)
 		},
 	}
 
 	rootCmd.Flags().StringVar(&flagName, "name", "", "name for worktree/container (default: random suffix)")
 	rootCmd.Flags().StringVar(&flagVCS, "vcs", "", "override VCS type: git or jj (default: auto-detect)")
+	rootCmd.Flags().BoolVar(&flagDocker, "docker", false, "mount Docker socket into the container")
 
 	if err := rootCmd.Execute(); err != nil {
 		var ec exitCodeError
@@ -65,7 +67,7 @@ func main() {
 	}
 }
 
-func run(name, vcsFlag string, extraArgs []string) error {
+func run(name, vcsFlag string, docker bool, extraArgs []string) error {
 	containerName := envOrDefault("CONTAINER_NAME", "claude-dev")
 	imageName := envOrDefault("IMAGE_NAME", "claude-devcontainer")
 
@@ -238,8 +240,8 @@ func run(name, vcsFlag string, extraArgs []string) error {
 		}
 	}
 
-	// Docker socket
-	if isSocket(dockerSock) {
+	// Docker socket (opt-in)
+	if docker && isSocket(dockerSock) {
 		addMount(dockerSock, dockerSock, false)
 	}
 
