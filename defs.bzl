@@ -1,25 +1,9 @@
 """Macro for consuming repos to create a devcontainer target."""
 
-load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
-
-def devcontainer(name = "devcontainer", vcs = "", **kwargs):
-    """Creates an sh_binary target that launches the Claude devcontainer.
-
-    Args:
-        name: Target name.
-        vcs: Version control system for worktree isolation ("git" or "jj").
-             Empty string (default) auto-detects from .jj/ or .git/ in the workspace.
-        **kwargs: Additional arguments passed to sh_binary.
-    """
-    env = dict(kwargs.pop("env", {}))
-    env["DEVCONTAINER_VCS"] = vcs
-    sh_binary(
+def devcontainer(name = "devcontainer", **kwargs):
+    """Creates a runnable target that launches the Claude devcontainer."""
+    native.alias(
         name = name,
-        srcs = [Label("//:start-devcontainer.sh")],
-        data = [
-            Label("//:Dockerfile"),
-            Label("//:.dockerignore"),
-        ],
-        env = env,
+        actual = Label("//:devcontainer"),
         **kwargs
     )

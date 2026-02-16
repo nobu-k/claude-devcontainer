@@ -1,12 +1,30 @@
+load("@gazelle//:def.bzl", "gazelle")
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
 load("//:defs.bzl", "devcontainer")
 
-exports_files(
-    [
-        "start-devcontainer.sh",
-        "Dockerfile",
-        ".dockerignore",
-    ],
+# gazelle:prefix github.com/nobu-k/claude-devcontainer
+
+gazelle(name = "gazelle")
+
+go_binary(
+    name = "devcontainer",
+    embed = [":claude-devcontainer_lib"],
     visibility = ["//visibility:public"],
 )
 
-devcontainer(name = "start", vcs = "jj")
+devcontainer(name = "start")
+
+go_library(
+    name = "claude-devcontainer_lib",
+    srcs = ["main.go"],
+    embedsrcs = [
+        ".dockerignore",
+        "Dockerfile",
+    ],
+    importpath = "github.com/nobu-k/claude-devcontainer",
+    visibility = ["//visibility:private"],
+    deps = [
+        "@com_github_spf13_cobra//:cobra",
+        "@org_golang_x_term//:term",
+    ],
+)
