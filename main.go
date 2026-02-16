@@ -269,6 +269,22 @@ func run(name, vcsFlag string, docker bool, extraArgs []string) error {
 			addMount(filepath.Join(originalWorkspace, ".git"), originalWorkspace+"/.git", false)
 		case "jj":
 			addMount(filepath.Join(originalWorkspace, ".jj/repo"), originalWorkspace+"/.jj/repo", false)
+			// If jj uses a git backend, also mount the git repo it points to.
+			gitTargetFile := filepath.Join(originalWorkspace, ".jj", "repo", "store", "git_target")
+			if data, err := os.ReadFile(gitTargetFile); err == nil {
+				target := strings.TrimSpace(string(data))
+				if !filepath.IsAbs(target) {
+					target = filepath.Join(originalWorkspace, ".jj", "repo", "store", target)
+				}
+				target = filepath.Clean(target)
+				// Only mount if not already under .jj/repo (which is already mounted)
+				jjRepo := filepath.Clean(filepath.Join(originalWorkspace, ".jj", "repo"))
+				if !strings.HasPrefix(target, jjRepo+string(filepath.Separator)) && target != jjRepo {
+					if isDir(target) {
+						addMount(target, target, false)
+					}
+				}
+			}
 		}
 	}
 
