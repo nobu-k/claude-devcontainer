@@ -93,4 +93,4 @@ RUN mkdir -p \
 USER ${USER_NAME}
 WORKDIR /workspace
 
-CMD ["claude"]
+CMD ["claude", "--dangerously-skip-permissions"]
