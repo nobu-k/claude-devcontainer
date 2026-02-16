@@ -271,7 +271,11 @@ func run(name, vcsFlag string, extraArgs []string) error {
 	}
 
 	// Build docker run args
-	dockerArgs := []string{"run", "--rm", "-i", "--name", containerName}
+	dockerArgs := []string{"run", "--rm", "-i",
+		"--cap-drop=ALL",
+		"--security-opt=no-new-privileges",
+		"--name", containerName,
+	}
 
 	// Allocate TTY if stdin is a terminal
 	if term.IsTerminal(int(os.Stdin.Fd())) {
