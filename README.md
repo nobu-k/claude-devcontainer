@@ -38,28 +38,50 @@ bazel build //:devcontainer
 
 ## Usage
 
+### `start` — Launch a new devcontainer
+
 Run from any Git or jj repository:
 
 ```sh
 # Launch Claude (default command) in an isolated worktree
-claude-devcontainer
+claude-devcontainer start
 
 # Run a specific command
-claude-devcontainer echo Hello
+claude-devcontainer start -- echo Hello
 
 # Name the worktree/container for easy identification
-claude-devcontainer --name my-feature
+claude-devcontainer start --name my-feature
 
 # Override VCS auto-detection
-claude-devcontainer --vcs git
+claude-devcontainer start --vcs git
+
+# Mount Docker socket into the container
+claude-devcontainer start --docker
+
+# Forward a port from the container to the host
+claude-devcontainer start --port 8080:8080
 ```
 
-### Flags
+#### Flags
 
 | Flag | Description |
 |------|-------------|
 | `--name` | Name for worktree and container (default: random suffix) |
 | `--vcs` | Override VCS type: `git` or `jj` (default: auto-detect from `.jj/` or `.git/`) |
+| `--docker` | Mount the Docker socket into the container |
+| `--port` | Publish a container port to the host (`hostPort:containerPort`) |
+
+### `exec` — Attach to a running devcontainer
+
+```sh
+# Attach to the only running devcontainer
+claude-devcontainer exec
+
+# Attach by name (matches "my-feature" or "devcontainer-my-feature")
+claude-devcontainer exec my-feature
+```
+
+If multiple devcontainers are running and no name is given, an interactive selection prompt is shown.
 
 ### Environment variables
 
@@ -95,15 +117,19 @@ Run it:
 ```sh
 bazel run //:start
 bazel run //:start -- --name my-session
-bazel run //:start -- echo Hello
+bazel run //:start -- -- echo Hello
 ```
 
 When invoked via `bazel run`, the tool automatically uses `BUILD_WORKSPACE_DIRECTORY` as the workspace root.
 
 ## How it works
 
+**`start`** creates a new session:
+
 1. Auto-detects VCS type (git or jj) in the current directory
 2. Creates an isolated worktree so the container doesn't modify your working copy
 3. Builds the Docker image (layer cache makes rebuilds fast)
 4. Runs the container with host directories mounted (toolchains, SSH keys, Claude config, etc.)
 5. On exit, cleans up the worktree automatically
+
+**`exec`** attaches to a running container by opening a bash shell with `docker exec`.
