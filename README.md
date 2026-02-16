@@ -1,0 +1,109 @@
+# claude-devcontainer
+
+A CLI tool that launches a Docker container pre-configured with [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and common development tools. Each session runs in an isolated VCS worktree so your main working copy stays untouched.
+
+## What's included
+
+The container image is based on Ubuntu 24.04 and ships with:
+
+- Claude Code (via npm)
+- Git, jj (Jujutsu)
+- Node.js, pnpm
+- Bazelisk
+- Rust toolchain (mounted from host)
+- Go toolchain (mounted from host)
+- Docker CLI (socket mounted from host)
+
+## Installation
+
+### go install
+
+```sh
+go install github.com/nobu-k/claude-devcontainer@latest
+```
+
+### Build from source
+
+```sh
+git clone https://github.com/nobu-k/claude-devcontainer.git
+cd claude-devcontainer
+go build .
+```
+
+### Bazel
+
+```sh
+bazel build //:devcontainer
+```
+
+## Usage
+
+Run from any Git or jj repository:
+
+```sh
+# Launch Claude (default command) in an isolated worktree
+claude-devcontainer
+
+# Run a specific command
+claude-devcontainer echo Hello
+
+# Name the worktree/container for easy identification
+claude-devcontainer --name my-feature
+
+# Override VCS auto-detection
+claude-devcontainer --vcs git
+```
+
+### Flags
+
+| Flag | Description |
+|------|-------------|
+| `--name` | Name for worktree and container (default: random suffix) |
+| `--vcs` | Override VCS type: `git` or `jj` (default: auto-detect from `.jj/` or `.git/`) |
+
+### Environment variables
+
+| Variable | Description |
+|----------|-------------|
+| `CONTAINER_NAME` | Base container name (default: `claude-dev`) |
+| `IMAGE_NAME` | Docker image name (default: `claude-devcontainer`) |
+| `DEVCONTAINER_VCS` | VCS type, overridden by `--vcs` flag |
+
+## Using with Bazel in another repository
+
+Add the dependency to your `MODULE.bazel`:
+
+```python
+bazel_dep(name = "claude-devcontainer", version = "0.1.0")
+git_override(
+    module_name = "claude-devcontainer",
+    remote = "https://github.com/nobu-k/claude-devcontainer.git",
+    commit = "<commit-hash>",
+)
+```
+
+Then create a target in your `BUILD.bazel`:
+
+```python
+load("@claude-devcontainer//:defs.bzl", "devcontainer")
+
+devcontainer(name = "start")
+```
+
+Run it:
+
+```sh
+bazel run //:start
+bazel run //:start -- --name my-session
+bazel run //:start -- echo Hello
+```
+
+When invoked via `bazel run`, the tool automatically uses `BUILD_WORKSPACE_DIRECTORY` as the workspace root.
+
+## How it works
+
+1. Auto-detects VCS type (git or jj) in the current directory
+2. Creates an isolated worktree so the container doesn't modify your working copy
+3. Builds the Docker image (layer cache makes rebuilds fast)
+4. Runs the container with host directories mounted (toolchains, SSH keys, Claude config, etc.)
+5. On exit, cleans up the worktree automatically
