@@ -5,6 +5,7 @@ ARG USER_UID=4000
 ARG USER_GID=4000
 ARG DOCKER_GID=984
 ARG BAZELISK_VERSION=v1.25.0
+ARG JJ_VERSION=0.38.0
 ARG NODE_MAJOR=24
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -47,6 +48,13 @@ RUN ARCH=$(dpkg --print-architecture) \
     && curl -fsSL -o /usr/local/bin/bazel \
         "https://github.com/bazelbuild/bazelisk/releases/download/${BAZELISK_VERSION}/bazelisk-linux-${ARCH}" \
     && chmod +x /usr/local/bin/bazel
+
+# Jujutsu (jj)
+RUN ARCH=$(uname -m) \
+    && curl -fsSL -o /tmp/jj.tar.gz \
+        "https://github.com/jj-vcs/jj/releases/download/v${JJ_VERSION}/jj-v${JJ_VERSION}-${ARCH}-unknown-linux-musl.tar.gz" \
+    && tar -xzf /tmp/jj.tar.gz -C /usr/local/bin ./jj \
+    && rm /tmp/jj.tar.gz
 
 # Claude CLI
 RUN npm install -g @anthropic-ai/claude-code
