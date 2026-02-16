@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	_ "embed"
 	"encoding/json"
 	"errors"
@@ -35,29 +36,15 @@ func (e exitCodeError) Error() string {
 }
 
 func main() {
-	var flagName string
-	var flagVCS string
-	var flagDocker bool
-	var flagPorts []string
-
 	rootCmd := &cobra.Command{
-		Use:   "devcontainer [flags] [-- command...]",
-		Short: "Launch a Claude devcontainer",
-		Long:  "Creates a Docker container with Claude Code and development tools, using VCS worktrees for isolation.",
-		// Accept arbitrary args after --
-		DisableFlagParsing: false,
-		Args:               cobra.ArbitraryArgs,
-		SilenceUsage:       true,
-		SilenceErrors:      true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(flagName, flagVCS, flagDocker, flagPorts, args)
-		},
+		Use:           "devcontainer",
+		Short:         "Manage Claude devcontainers",
+		SilenceUsage:  true,
+		SilenceErrors: true,
 	}
 
-	rootCmd.Flags().StringVar(&flagName, "name", "", "name for worktree/container (default: random suffix)")
-	rootCmd.Flags().StringVar(&flagVCS, "vcs", "", "override VCS type: git or jj (default: auto-detect)")
-	rootCmd.Flags().BoolVar(&flagDocker, "docker", false, "mount Docker socket into the container")
-	rootCmd.Flags().StringArrayVar(&flagPorts, "port", nil, "publish a container port to the host (hostPort:containerPort)")
+	rootCmd.AddCommand(newStartCmd())
+	rootCmd.AddCommand(newExecCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		var ec exitCodeError
@@ -67,6 +54,174 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+func newStartCmd() *cobra.Command {
+	var flagName string
+	var flagVCS string
+	var flagDocker bool
+	var flagPorts []string
+
+	cmd := &cobra.Command{
+		Use:   "start [flags] [-- command...]",
+		Short: "Launch a new Claude devcontainer",
+		Long:  "Creates a Docker container with Claude Code and development tools, using VCS worktrees for isolation.",
+		Args:  cobra.ArbitraryArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return run(flagName, flagVCS, flagDocker, flagPorts, args)
+		},
+	}
+
+	cmd.Flags().StringVar(&flagName, "name", "", "name for worktree/container (default: random suffix)")
+	cmd.Flags().StringVar(&flagVCS, "vcs", "", "override VCS type: git or jj (default: auto-detect)")
+	cmd.Flags().BoolVar(&flagDocker, "docker", false, "mount Docker socket into the container")
+	cmd.Flags().StringArrayVar(&flagPorts, "port", nil, "publish a container port to the host (hostPort:containerPort)")
+
+	return cmd
+}
+
+type containerInfo struct {
+	ID    string `json:"ID"`
+	Names string `json:"Names"`
+}
+
+func newExecCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "exec [container-name]",
+		Short: "Attach to a running devcontainer",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			var target string
+			if len(args) > 0 {
+				target = args[0]
+			}
+			name, err := resolveContainer(target)
+			if err != nil {
+				return err
+			}
+			return runExec(name)
+		},
+	}
+}
+
+func listDevcontainers() ([]containerInfo, error) {
+	out, err := exec.Command("docker", "ps",
+		"--filter", "name=devcontainer-",
+		"--filter", "name=claude-dev",
+		"--format", "{{json .}}",
+	).Output()
+	if err != nil {
+		return nil, fmt.Errorf("listing containers: %w", err)
+	}
+
+	var containers []containerInfo
+	scanner := bufio.NewScanner(strings.NewReader(string(out)))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		var ci containerInfo
+		if err := json.Unmarshal([]byte(line), &ci); err != nil {
+			continue
+		}
+		containers = append(containers, ci)
+	}
+	return containers, nil
+}
+
+func resolveContainer(target string) (string, error) {
+	containers, err := listDevcontainers()
+	if err != nil {
+		return "", err
+	}
+	if len(containers) == 0 {
+		return "", fmt.Errorf("no running devcontainers found")
+	}
+
+	if target != "" {
+		for _, c := range containers {
+			if c.Names == target || c.Names == "devcontainer-"+target {
+				return c.Names, nil
+			}
+		}
+		return "", fmt.Errorf("no running devcontainer matching %q", target)
+	}
+
+	if len(containers) == 1 {
+		return containers[0].Names, nil
+	}
+
+	return promptSelectContainer(containers)
+}
+
+func promptSelectContainer(containers []containerInfo) (string, error) {
+	if !term.IsTerminal(int(os.Stdin.Fd())) {
+		return "", fmt.Errorf("multiple devcontainers running; specify a name or run interactively")
+	}
+
+	fmt.Fprintln(os.Stderr, "Multiple devcontainers running:")
+	for i, c := range containers {
+		fmt.Fprintf(os.Stderr, "  [%d] %s\n", i+1, c.Names)
+	}
+	fmt.Fprintf(os.Stderr, "Select [1-%d]: ", len(containers))
+
+	reader := bufio.NewReader(os.Stdin)
+	line, err := reader.ReadString('\n')
+	if err != nil {
+		return "", fmt.Errorf("reading selection: %w", err)
+	}
+
+	choice, err := strconv.Atoi(strings.TrimSpace(line))
+	if err != nil || choice < 1 || choice > len(containers) {
+		return "", fmt.Errorf("invalid selection")
+	}
+	return containers[choice-1].Names, nil
+}
+
+func runExec(containerName string) error {
+	dockerArgs := []string{"exec", "-i"}
+	if term.IsTerminal(int(os.Stdin.Fd())) {
+		dockerArgs = append(dockerArgs, "-t")
+	}
+	dockerArgs = append(dockerArgs, containerName, "bash")
+
+	dockerCmd := exec.Command("docker", dockerArgs...)
+	dockerCmd.Stdin = os.Stdin
+	dockerCmd.Stdout = os.Stdout
+	dockerCmd.Stderr = os.Stderr
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
+	if err := dockerCmd.Start(); err != nil {
+		return fmt.Errorf("starting docker exec: %w", err)
+	}
+
+	go func() {
+		for sig := range sigCh {
+			if dockerCmd.Process != nil {
+				dockerCmd.Process.Signal(sig)
+			}
+		}
+	}()
+
+	exitCode := 0
+	if err := dockerCmd.Wait(); err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			exitCode = exitErr.ExitCode()
+		} else {
+			return fmt.Errorf("running docker exec: %w", err)
+		}
+	}
+
+	signal.Stop(sigCh)
+	close(sigCh)
+
+	if exitCode != 0 {
+		return exitCodeError{code: exitCode}
+	}
+	return nil
 }
 
 func run(name, vcsFlag string, docker bool, ports []string, extraArgs []string) error {

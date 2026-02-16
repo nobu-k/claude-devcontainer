@@ -10,7 +10,7 @@ def _devcontainer_impl(ctx):
 
     ctx.actions.write(
         output = script,
-        content = '#!/bin/bash\nexec "{}" {} "$@"\n'.format(
+        content = '#!/bin/bash\nexec "{}" start {} "$@"\n'.format(
             ctx.executable._binary.short_path,
             " ".join(args),
         ),
