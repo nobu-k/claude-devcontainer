@@ -96,7 +96,15 @@ func newExecCmd() *cobra.Command {
 			if len(args) > 0 {
 				target = args[0]
 			}
-			name, err := resolveContainer(target)
+			workspaceDir := os.Getenv("BUILD_WORKSPACE_DIRECTORY")
+			if workspaceDir == "" {
+				var err error
+				workspaceDir, err = os.Getwd()
+				if err != nil {
+					return fmt.Errorf("getting working directory: %w", err)
+				}
+			}
+			name, err := resolveContainer(target, workspaceDir)
 			if err != nil {
 				return err
 			}
@@ -105,12 +113,17 @@ func newExecCmd() *cobra.Command {
 	}
 }
 
-func listDevcontainers() ([]containerInfo, error) {
-	out, err := exec.Command("docker", "ps",
+func listDevcontainers(workspaceDir string) ([]containerInfo, error) {
+	args := []string{"ps",
 		"--filter", "name=devcontainer-",
 		"--filter", "name=claude-dev",
-		"--format", "{{json .}}",
-	).Output()
+	}
+	if workspaceDir != "" {
+		args = append(args, "--filter", "label=claude-devcontainer.workspace="+workspaceDir)
+	}
+	args = append(args, "--format", "{{json .}}")
+
+	out, err := exec.Command("docker", args...).Output()
 	if err != nil {
 		return nil, fmt.Errorf("listing containers: %w", err)
 	}
@@ -131,8 +144,8 @@ func listDevcontainers() ([]containerInfo, error) {
 	return containers, nil
 }
 
-func resolveContainer(target string) (string, error) {
-	containers, err := listDevcontainers()
+func resolveContainer(target, workspaceDir string) (string, error) {
+	containers, err := listDevcontainers(workspaceDir)
 	if err != nil {
 		return "", err
 	}
@@ -459,10 +472,17 @@ func run(name, vcsFlag string, docker bool, ports []string, extraArgs []string) 
 		}
 	}
 
+	// Determine source repository for labeling
+	sourceWorkspace := workspaceDir
+	if originalWorkspace != "" {
+		sourceWorkspace = originalWorkspace
+	}
+
 	// Build docker run args
 	dockerArgs := []string{"run", "--rm", "-i",
 		"--cap-drop=ALL",
 		"--security-opt=no-new-privileges",
+		"--label", "claude-devcontainer.workspace=" + sourceWorkspace,
 		"--name", containerName,
 	}
 
