@@ -8,4 +8,4 @@ bazel_dep(name = "gazelle", version = "0.45.0")
 
 go_deps = use_extension("@gazelle//:extensions.bzl", "go_deps")
 go_deps.from_file(go_mod = "//:go.mod")
-use_repo(go_deps, "com_github_spf13_cobra", "org_golang_x_term")
+use_repo(go_deps, "com_github_manifoldco_promptui", "com_github_spf13_cobra", "org_golang_x_term")
