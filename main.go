@@ -409,8 +409,14 @@ func run(name, vcsFlag string, docker bool, ports []string, extraArgs []string) 
 	addMount(filepath.Join(homeDir, ".claude.json"), devHome+"/.claude.json", false)
 
 	// Bazel output base (only if repo uses Bazel)
-	if fileExists(filepath.Join(workspaceDir, "MODULE.bazel")) {
-		out, err := exec.Command("bazel", "info", "output_base").Output()
+	bazelWorkspace := workspaceDir
+	if originalWorkspace != "" {
+		bazelWorkspace = originalWorkspace
+	}
+	if fileExists(filepath.Join(bazelWorkspace, "MODULE.bazel")) {
+		cmd := exec.Command("bazel", "info", "output_base")
+		cmd.Dir = bazelWorkspace
+		out, err := cmd.Output()
 		if err == nil {
 			outputBase := strings.TrimSpace(string(out))
 			bazelRC, err := os.CreateTemp("", "bazel-rc-")
