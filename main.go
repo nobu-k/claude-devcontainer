@@ -433,6 +433,9 @@ func run(name, vcsFlag string, docker bool, ports []string, extraArgs []string) 
 	if fileExists(filepath.Join(homeDir, ".gitconfig")) {
 		addMount(filepath.Join(homeDir, ".gitconfig"), devHome+"/.gitconfig", true)
 	}
+	if isDir(filepath.Join(homeDir, ".config/gh")) {
+		addMount(filepath.Join(homeDir, ".config/gh"), devHome+"/.config/gh", true)
+	}
 	if isDir(filepath.Join(homeDir, ".config/jj")) {
 		addMount(filepath.Join(homeDir, ".config/jj"), devHome+"/.config/jj", true)
 	}

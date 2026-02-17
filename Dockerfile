@@ -56,6 +56,17 @@ RUN ARCH=$(uname -m) \
     && tar -xzf /tmp/jj.tar.gz -C /usr/local/bin ./jj \
     && rm /tmp/jj.tar.gz
 
+# GitHub CLI
+RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+        | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] \
+        https://cli.github.com/packages stable main" \
+        > /etc/apt/sources.list.d/github-cli.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends gh \
+    && rm -rf /var/lib/apt/lists/*
+
 # Claude CLI
 RUN npm install -g @anthropic-ai/claude-code
 
@@ -84,6 +95,7 @@ RUN mkdir -p \
         /home/${USER_NAME}/go \
         /home/${USER_NAME}/gopath \
         /home/${USER_NAME}/.npm \
+        /home/${USER_NAME}/.config/gh \
         /home/${USER_NAME}/.config/jj \
         /home/${USER_NAME}/.claude \
         /home/${USER_NAME}/.ssh \
