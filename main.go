@@ -16,6 +16,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -160,23 +161,22 @@ func promptSelectContainer(containers []containerInfo) (string, error) {
 		return "", fmt.Errorf("multiple devcontainers running; specify a name or run interactively")
 	}
 
-	fmt.Fprintln(os.Stderr, "Multiple devcontainers running:")
+	items := make([]string, len(containers))
 	for i, c := range containers {
-		fmt.Fprintf(os.Stderr, "  [%d] %s\n", i+1, c.Names)
+		items[i] = c.Names
 	}
-	fmt.Fprintf(os.Stderr, "Select [1-%d]: ", len(containers))
 
-	reader := bufio.NewReader(os.Stdin)
-	line, err := reader.ReadString('\n')
+	prompt := promptui.Select{
+		Label:  "Select a devcontainer",
+		Items:  items,
+		Stdout: os.Stderr,
+	}
+
+	idx, _, err := prompt.Run()
 	if err != nil {
-		return "", fmt.Errorf("reading selection: %w", err)
+		return "", fmt.Errorf("selection: %w", err)
 	}
-
-	choice, err := strconv.Atoi(strings.TrimSpace(line))
-	if err != nil || choice < 1 || choice > len(containers) {
-		return "", fmt.Errorf("invalid selection")
-	}
-	return containers[choice-1].Names, nil
+	return containers[idx].Names, nil
 }
 
 func runExec(containerName string) error {
