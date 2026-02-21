@@ -464,6 +464,11 @@ func run(name, vcsFlag string, docker bool, ports []string, resume string, extra
 		envArgs = append(envArgs, "-e", "SSH_AUTH_SOCK=/tmp/ssh-agent.sock")
 	}
 
+	// Host timezone
+	if tz := detectTimezone(); tz != "" {
+		envArgs = append(envArgs, "-e", "TZ="+tz)
+	}
+
 	// Worktree VCS backend: mount original repo's VCS dir
 	if worktreeDir != "" {
 		switch vcs {
@@ -671,5 +676,25 @@ func isSocket(path string) bool {
 		return false
 	}
 	return info.Mode().Type() == fs.ModeSocket
+}
+
+// detectTimezone returns the host's IANA timezone (e.g. "America/New_York").
+// It checks TZ, /etc/timezone, then /etc/localtime in that order.
+func detectTimezone() string {
+	if tz := os.Getenv("TZ"); tz != "" {
+		return tz
+	}
+	if data, err := os.ReadFile("/etc/timezone"); err == nil {
+		if tz := strings.TrimSpace(string(data)); tz != "" {
+			return tz
+		}
+	}
+	if target, err := filepath.EvalSymlinks("/etc/localtime"); err == nil {
+		const marker = "zoneinfo/"
+		if i := strings.LastIndex(target, marker); i != -1 {
+			return target[i+len(marker):]
+		}
+	}
+	return ""
 }
 
