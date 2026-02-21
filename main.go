@@ -103,6 +103,7 @@ func newExecCmd() *cobra.Command {
 				if err != nil {
 					return fmt.Errorf("getting working directory: %w", err)
 				}
+				workspaceDir = findVCSRoot(workspaceDir)
 			}
 			name, err := resolveContainer(target, workspaceDir)
 			if err != nil {
@@ -262,6 +263,7 @@ func run(name, vcsFlag string, docker bool, ports []string, extraArgs []string) 
 		if err != nil {
 			return fmt.Errorf("getting working directory: %w", err)
 		}
+		workspaceDir = findVCSRoot(workspaceDir)
 	}
 
 	// VCS resolution: flag > env > auto-detect
@@ -620,6 +622,23 @@ func runCmd(name string, args ...string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
+}
+
+// findVCSRoot walks up from dir looking for a .jj or .git directory,
+// returning the containing directory. Returns dir unchanged if no VCS root
+// is found.
+func findVCSRoot(dir string) string {
+	cur := dir
+	for {
+		if isDir(filepath.Join(cur, ".jj")) || isDir(filepath.Join(cur, ".git")) {
+			return cur
+		}
+		parent := filepath.Dir(cur)
+		if parent == cur {
+			return dir
+		}
+		cur = parent
+	}
 }
 
 func isDir(path string) bool {
