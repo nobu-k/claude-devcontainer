@@ -52,6 +52,12 @@ claude-devcontainer start -- echo Hello
 # Name the worktree/container for easy identification
 claude-devcontainer start --name my-feature
 
+# Resume the most recent Claude session
+claude-devcontainer start --name my-feature --resume
+
+# Resume a specific Claude session by ID
+claude-devcontainer start --name my-feature --resume <session-id>
+
 # Override VCS auto-detection
 claude-devcontainer start --vcs git
 
@@ -67,6 +73,7 @@ claude-devcontainer start --port 8080:8080
 | Flag | Description |
 |------|-------------|
 | `--name` | Name for worktree and container (default: random suffix) |
+| `--resume` | Resume a Claude session by ID; pass without a value to resume the most recent session |
 | `--vcs` | Override VCS type: `git` or `jj` (default: auto-detect from `.jj/` or `.git/`) |
 | `--docker` | Mount the Docker socket into the container |
 | `--port` | Publish a container port to the host (`hostPort:containerPort`) |
@@ -133,8 +140,10 @@ When invoked via `bazel run`, the tool automatically uses `BUILD_WORKSPACE_DIREC
 
 1. Auto-detects VCS type (git or jj) in the current directory
 2. Creates an isolated worktree so the container doesn't modify your working copy
+   - With `--name`, the git branch is reused across runs (the worktree is recreated from the existing branch)
 3. Builds the Docker image (layer cache makes rebuilds fast)
 4. Runs the container with host directories mounted (toolchains, SSH keys, Claude config, etc.)
-5. On exit, cleans up the worktree automatically
+5. The host timezone is inherited by the container
+6. On exit, cleans up the worktree automatically
 
 **`exec`** attaches to a running container by opening a bash shell with `docker exec`.
