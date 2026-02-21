@@ -62,6 +62,7 @@ func newStartCmd() *cobra.Command {
 	var flagVCS string
 	var flagDocker bool
 	var flagPorts []string
+	var flagResume string
 
 	cmd := &cobra.Command{
 		Use:   "start [flags] [-- command...]",
@@ -69,7 +70,7 @@ func newStartCmd() *cobra.Command {
 		Long:  "Creates a Docker container with Claude Code and development tools, using VCS worktrees for isolation.",
 		Args:  cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(flagName, flagVCS, flagDocker, flagPorts, args)
+			return run(flagName, flagVCS, flagDocker, flagPorts, flagResume, args)
 		},
 	}
 
@@ -77,6 +78,8 @@ func newStartCmd() *cobra.Command {
 	cmd.Flags().StringVar(&flagVCS, "vcs", "", "override VCS type: git or jj (default: auto-detect)")
 	cmd.Flags().BoolVar(&flagDocker, "docker", false, "mount Docker socket into the container")
 	cmd.Flags().StringArrayVar(&flagPorts, "port", nil, "publish a container port to the host (hostPort:containerPort)")
+	cmd.Flags().StringVar(&flagResume, "resume", "", "resume a Claude session by ID or name")
+	cmd.Flags().Lookup("resume").NoOptDefVal = " "
 
 	return cmd
 }
@@ -238,7 +241,11 @@ func runExec(containerName string) error {
 	return nil
 }
 
-func run(name, vcsFlag string, docker bool, ports []string, extraArgs []string) error {
+func run(name, vcsFlag string, docker bool, ports []string, resume string, extraArgs []string) error {
+	if resume != "" && len(extraArgs) > 0 {
+		return fmt.Errorf("cannot combine --resume with extra command arguments")
+	}
+
 	// Validate port mappings
 	for _, p := range ports {
 		parts := strings.SplitN(p, ":", 2)
@@ -508,7 +515,14 @@ func run(name, vcsFlag string, docker bool, ports []string, extraArgs []string) 
 		dockerArgs = append(dockerArgs, "-p", p)
 	}
 	dockerArgs = append(dockerArgs, imageName)
-	dockerArgs = append(dockerArgs, extraArgs...)
+	if resume != "" {
+		dockerArgs = append(dockerArgs, "claude", "--dangerously-skip-permissions", "--resume")
+		if strings.TrimSpace(resume) != "" {
+			dockerArgs = append(dockerArgs, resume)
+		}
+	} else {
+		dockerArgs = append(dockerArgs, extraArgs...)
+	}
 
 	// Run docker as subprocess with signal forwarding
 	dockerCmd := exec.Command("docker", dockerArgs...)
