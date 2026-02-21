@@ -319,8 +319,17 @@ func run(name, vcsFlag string, docker bool, ports []string, resume string, extra
 		switch vcs {
 		case "git":
 			branchName = "devcontainer-" + suffix
-			if err := runCmd("git", "-C", workspaceDir, "worktree", "add", "-b", branchName, worktreeDir); err != nil {
-				return fmt.Errorf("creating git worktree: %w", err)
+			// Check if branch already exists (e.g. from a previous run whose
+			// worktree was cleaned up but the branch was kept).
+			if exec.Command("git", "-C", workspaceDir, "rev-parse", "--verify", branchName).Run() == nil {
+				// Branch exists — attach worktree without -b
+				if err := runCmd("git", "-C", workspaceDir, "worktree", "add", worktreeDir, branchName); err != nil {
+					return fmt.Errorf("creating git worktree: %w", err)
+				}
+			} else {
+				if err := runCmd("git", "-C", workspaceDir, "worktree", "add", "-b", branchName, worktreeDir); err != nil {
+					return fmt.Errorf("creating git worktree: %w", err)
+				}
 			}
 		case "jj":
 			worktreeName = "devcontainer-" + suffix
