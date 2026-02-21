@@ -333,6 +333,14 @@ func run(name, vcsFlag string, docker bool, ports []string, resume string, extra
 		workspaceDir = worktreeDir
 	}
 
+	// containerWorkspace is the path where the workspace appears inside the
+	// container.  Using the host path lets Claude Code share session data
+	// between host and container (sessions are keyed by absolute path).
+	containerWorkspace := workspaceDir
+	if originalWorkspace != "" {
+		containerWorkspace = originalWorkspace
+	}
+
 	// Write embedded files to temp dir for docker build context
 	contextDir, err := os.MkdirTemp("", "devcontainer-context-")
 	if err != nil {
@@ -387,9 +395,9 @@ func run(name, vcsFlag string, docker bool, ports []string, resume string, extra
 	rmCmd.Stderr = nil
 	rmCmd.Run()
 
-	// Trust /workspace in claude.json
+	// Trust the container workspace path in claude.json
 	claudeJSON := filepath.Join(homeDir, ".claude.json")
-	if err := trustWorkspace(claudeJSON); err != nil {
+	if err := trustWorkspace(claudeJSON, containerWorkspace); err != nil {
 		// Non-fatal: warn and continue
 		fmt.Fprintf(os.Stderr, "warning: could not update %s: %v\n", claudeJSON, err)
 	}
@@ -406,7 +414,7 @@ func run(name, vcsFlag string, docker bool, ports []string, resume string, extra
 		mounts = append(mounts, "-v", src+":"+dst+opt)
 	}
 
-	addMount(workspaceDir, "/workspace", false)
+	addMount(workspaceDir, containerWorkspace, false)
 	addMount(filepath.Join(homeDir, ".cache/bazelisk"), devHome+"/.cache/bazelisk", true)
 	addMount(filepath.Join(homeDir, ".cargo"), devHome+"/.cargo", true)
 	addMount(filepath.Join(homeDir, ".rustup"), devHome+"/.rustup", true)
@@ -495,17 +503,12 @@ func run(name, vcsFlag string, docker bool, ports []string, resume string, extra
 		}
 	}
 
-	// Determine source repository for labeling
-	sourceWorkspace := workspaceDir
-	if originalWorkspace != "" {
-		sourceWorkspace = originalWorkspace
-	}
-
 	// Build docker run args
 	dockerArgs := []string{"run", "--rm", "-i",
 		"--cap-drop=ALL",
 		"--security-opt=no-new-privileges",
-		"--label", "claude-devcontainer.workspace=" + sourceWorkspace,
+		"--label", "claude-devcontainer.workspace=" + containerWorkspace,
+		"-w", containerWorkspace,
 		"--name", containerName,
 	}
 
@@ -591,7 +594,7 @@ func cleanupWorktree(worktreeDir, vcs, originalWorkspace, branchName, worktreeNa
 	}
 }
 
-func trustWorkspace(claudeJSONPath string) error {
+func trustWorkspace(claudeJSONPath string, workspacePath string) error {
 	if !fileExists(claudeJSONPath) {
 		return nil
 	}
@@ -612,10 +615,10 @@ func trustWorkspace(claudeJSONPath string) error {
 		config["projects"] = projects
 	}
 
-	workspace, ok := projects["/workspace"].(map[string]interface{})
+	workspace, ok := projects[workspacePath].(map[string]interface{})
 	if !ok {
 		workspace = make(map[string]interface{})
-		projects["/workspace"] = workspace
+		projects[workspacePath] = workspace
 	}
 
 	workspace["hasTrustDialogAccepted"] = true

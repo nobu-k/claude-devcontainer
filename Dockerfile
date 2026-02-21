@@ -100,10 +100,8 @@ RUN mkdir -p \
         /home/${USER_NAME}/.config/jj \
         /home/${USER_NAME}/.claude \
         /home/${USER_NAME}/.ssh \
-        /workspace \
-    && chown -R ${USER_UID}:${USER_GID} /home/${USER_NAME} /workspace
+    && chown -R ${USER_UID}:${USER_GID} /home/${USER_NAME}
 
 USER ${USER_NAME}
-WORKDIR /workspace
 
 CMD ["claude", "--dangerously-skip-permissions"]
