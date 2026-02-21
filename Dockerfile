@@ -23,6 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         unzip \
         xz-utils \
         python3 \
+        tzdata \
     && rm -rf /var/lib/apt/lists/*
 
 # Docker CLI
