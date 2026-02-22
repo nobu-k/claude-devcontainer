@@ -490,6 +490,10 @@ func run(name, vcsFlag string, docker bool, ports []string, resume string, extra
 	if worktreeDir != "" {
 		switch vcs {
 		case "git":
+			// The worktree contains a .git gitlink file, but we need to
+			// bind-mount the original .git directory over it. Remove the
+			// file so Docker can mount a directory in its place.
+			os.Remove(filepath.Join(worktreeDir, ".git"))
 			addMount(filepath.Join(originalWorkspace, ".git"), originalWorkspace+"/.git", false)
 		case "jj":
 			addMount(filepath.Join(originalWorkspace, ".jj/repo"), originalWorkspace+"/.jj/repo", false)
