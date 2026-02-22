@@ -602,10 +602,6 @@ func cleanupWorktree(worktreeDir, vcs, originalWorkspace, branchName, worktreeNa
 		// directory and prune stale worktree metadata.
 		os.RemoveAll(worktreeDir)
 		runCmd("git", "-C", originalWorkspace, "worktree", "prune")
-		// Delete branch only if fully merged
-		if err := runCmd("git", "-C", originalWorkspace, "merge-base", "--is-ancestor", branchName, "HEAD"); err == nil {
-			runCmd("git", "-C", originalWorkspace, "branch", "-d", branchName)
-		}
 	case "jj":
 		runCmd("jj", "-R", originalWorkspace, "workspace", "forget", worktreeName)
 		os.RemoveAll(worktreeDir)
