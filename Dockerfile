@@ -71,6 +71,31 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
 # Claude CLI
 RUN npm install -g @anthropic-ai/claude-code
 
+# Playwright + headless Chromium for visual inspection
+RUN npm install -g playwright && playwright install chromium --with-deps \
+    && rm -rf /var/lib/apt/lists/*
+
+# take-screenshot helper
+RUN cat <<'SCRIPT' > /usr/local/bin/take-screenshot && chmod +x /usr/local/bin/take-screenshot
+#!/bin/bash
+URL="${1:?Usage: take-screenshot <url> <output-path> [width] [height]}"
+OUTPUT="${2:?Usage: take-screenshot <url> <output-path> [width] [height]}"
+WIDTH="${3:-1280}"
+HEIGHT="${4:-720}"
+
+node -e "
+const { chromium } = require('playwright');
+(async () => {
+  const [,, url, output, width, height] = process.argv;
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: parseInt(width), height: parseInt(height) } });
+  await page.goto(url, { waitUntil: 'networkidle' });
+  await page.screenshot({ path: output, fullPage: false });
+  await browser.close();
+})();
+" "$URL" "$OUTPUT" "$WIDTH" "$HEIGHT"
+SCRIPT
+
 # User setup
 RUN groupadd --gid ${USER_GID} ${USER_NAME} \
     && useradd --uid ${USER_UID} --gid ${USER_GID} -m ${USER_NAME} \
