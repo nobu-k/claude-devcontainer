@@ -496,6 +496,10 @@ func run(name, vcsFlag string, docker bool, ports []string, resume string, extra
 			os.Remove(filepath.Join(worktreeDir, ".git"))
 			addMount(filepath.Join(originalWorkspace, ".git"), originalWorkspace+"/.git", false)
 		case "jj":
+			// The workspace contains a .jj/repo file (pointer to the
+			// original repo), but we need to bind-mount the original
+			// .jj/repo directory over it. Remove the file first.
+			os.Remove(filepath.Join(worktreeDir, ".jj", "repo"))
 			addMount(filepath.Join(originalWorkspace, ".jj/repo"), originalWorkspace+"/.jj/repo", false)
 			// If jj uses a git backend, also mount the git repo it points to.
 			gitTargetFile := filepath.Join(originalWorkspace, ".jj", "repo", "store", "git_target")
