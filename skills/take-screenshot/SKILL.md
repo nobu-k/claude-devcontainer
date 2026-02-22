@@ -1,8 +1,13 @@
-## Taking browser screenshots
+---
+name: take-screenshot
+description: Capture a browser screenshot of a web page using headless Chromium. Use when you need to visually inspect a running web app.
+---
 
-The devcontainer includes a `take-screenshot` command for capturing web page screenshots using headless Chromium.
+# take-screenshot
 
-### Usage
+Capture a browser screenshot using headless Chromium.
+
+## Usage
 
 ```
 take-screenshot <url> <output-path> [width] [height]
@@ -13,15 +18,15 @@ take-screenshot <url> <output-path> [width] [height]
 - **width** — Viewport width in pixels (default: 1280)
 - **height** — Viewport height in pixels (default: 720)
 
-### Example
+## Example
 
-```
+```bash
 take-screenshot http://localhost:3000 /tmp/home.png
 ```
 
 Then use the Read tool to view the resulting PNG.
 
-### Tips
+## Tips
 
 - The page waits for `networkidle` before capturing, so dynamically loaded content should be visible.
 - To capture a specific viewport size (e.g., mobile), pass width and height: `take-screenshot http://localhost:3000 /tmp/mobile.png 375 812`
