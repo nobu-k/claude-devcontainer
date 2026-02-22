@@ -134,6 +134,14 @@ bazel run //:attach -- my-feature
 
 When invoked via `bazel run`, the tool automatically uses `BUILD_WORKSPACE_DIRECTORY` as the workspace root.
 
+## Claude instructions for container tools
+
+The `claude-instructions/` directory contains markdown snippets documenting tools available inside the container. Copy the relevant snippets into your project's `CLAUDE.md` so that Claude agents running in the devcontainer know how to use them.
+
+Available instructions:
+
+- [`take-screenshot.md`](claude-instructions/take-screenshot.md) — Capture browser screenshots with headless Chromium
+
 ## How it works
 
 **`start`** creates a new session:
