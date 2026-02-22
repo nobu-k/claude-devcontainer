@@ -490,11 +490,21 @@ func run(name, vcsFlag string, docker bool, ports []string, resume string, extra
 	if worktreeDir != "" {
 		switch vcs {
 		case "git":
-			// The worktree contains a .git gitlink file, but we need to
-			// bind-mount the original .git directory over it. Remove the
-			// file so Docker can mount a directory in its place.
-			os.Remove(filepath.Join(worktreeDir, ".git"))
-			addMount(filepath.Join(originalWorkspace, ".git"), originalWorkspace+"/.git", false)
+			// Mount the original .git at a non-conflicting path. We can't
+			// mount it at containerWorkspace/.git because the worktree has
+			// a .git gitlink file there (Docker can't mount a directory
+			// over a file). Rewrite the gitlink to point to the mounted
+			// path so git preserves the worktree identity and uses the
+			// worktree's own index/HEAD instead of the main ones.
+			dotGitMount := "/.devcontainer-git"
+			gitlinkPath := filepath.Join(worktreeDir, ".git")
+			if data, err := os.ReadFile(gitlinkPath); err == nil {
+				gitdir := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(string(data)), "gitdir: "))
+				hostDotGit := filepath.Join(originalWorkspace, ".git")
+				newGitdir := strings.Replace(gitdir, hostDotGit, dotGitMount, 1)
+				os.WriteFile(gitlinkPath, []byte("gitdir: "+newGitdir+"\n"), 0644)
+			}
+			addMount(filepath.Join(originalWorkspace, ".git"), dotGitMount, false)
 		case "jj":
 			// The workspace contains a .jj/repo file (pointer to the
 			// original repo), but we need to bind-mount the original
