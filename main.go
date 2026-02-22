@@ -596,7 +596,12 @@ func cleanupWorktree(worktreeDir, vcs, originalWorkspace, branchName, worktreeNa
 	}
 	switch vcs {
 	case "git":
-		runCmd("git", "-C", originalWorkspace, "worktree", "remove", "--force", worktreeDir)
+		// The .git gitlink file is removed before container start so
+		// Docker can bind-mount the original .git directory. Because of
+		// this, "git worktree remove" would fail. Instead, delete the
+		// directory and prune stale worktree metadata.
+		os.RemoveAll(worktreeDir)
+		runCmd("git", "-C", originalWorkspace, "worktree", "prune")
 		// Delete branch only if fully merged
 		if err := runCmd("git", "-C", originalWorkspace, "merge-base", "--is-ancestor", branchName, "HEAD"); err == nil {
 			runCmd("git", "-C", originalWorkspace, "branch", "-d", branchName)
