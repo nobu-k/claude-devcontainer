@@ -425,7 +425,7 @@ func run(name, vcsFlag string, docker bool, ports []string, resume string, extra
 
 	addMount(workspaceDir, containerWorkspace, false)
 	addMount(filepath.Join(homeDir, ".cache/bazelisk"), devHome+"/.cache/bazelisk", true)
-	addMount(filepath.Join(homeDir, ".cargo"), devHome+"/.cargo", true)
+	addMount(filepath.Join(homeDir, ".cargo"), devHome+"/.cargo", false)
 	addMount(filepath.Join(homeDir, ".rustup"), devHome+"/.rustup", true)
 	addMount(filepath.Join(homeDir, "go"), devHome+"/go", true)
 	addMount(filepath.Join(homeDir, "dev/go"), devHome+"/gopath", false)
