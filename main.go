@@ -429,7 +429,7 @@ func run(name, vcsFlag string, docker bool, ports []string, resume string, extra
 	addMount(filepath.Join(homeDir, ".rustup"), devHome+"/.rustup", true)
 	addMount(filepath.Join(homeDir, "go"), devHome+"/go", true)
 	addMount(filepath.Join(homeDir, "dev/go"), devHome+"/gopath", false)
-	addMount(filepath.Join(homeDir, ".npm"), devHome+"/.npm", true)
+	addMount(filepath.Join(homeDir, ".npm"), devHome+"/.npm", false)
 	addMount(filepath.Join(homeDir, ".cache/pnpm"), devHome+"/.cache/pnpm", true)
 	addMount(filepath.Join(homeDir, ".claude"), devHome+"/.claude", false)
 	addMount(filepath.Join(homeDir, ".claude.json"), devHome+"/.claude.json", false)
