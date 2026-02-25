@@ -45,6 +45,7 @@ func main() {
 	}
 
 	rootCmd.AddCommand(newStartCmd())
+	rootCmd.AddCommand(newBuildCmd())
 	rootCmd.AddCommand(newExecCmd())
 
 	if err := rootCmd.Execute(); err != nil {
@@ -87,6 +88,64 @@ func newStartCmd() *cobra.Command {
 type containerInfo struct {
 	ID    string `json:"ID"`
 	Names string `json:"Names"`
+}
+
+func newBuildCmd() *cobra.Command {
+	var flagNoCache bool
+
+	cmd := &cobra.Command{
+		Use:   "build",
+		Short: "Rebuild the devcontainer image",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runBuild(flagNoCache)
+		},
+	}
+
+	cmd.Flags().BoolVar(&flagNoCache, "no-cache", false, "build without using Docker layer cache")
+
+	return cmd
+}
+
+func runBuild(noCache bool) error {
+	imageName := envOrDefault("IMAGE_NAME", "claude-devcontainer")
+
+	u, err := user.Current()
+	if err != nil {
+		return fmt.Errorf("getting current user: %w", err)
+	}
+
+	dockerGID := "984"
+	if info, err := os.Stat("/var/run/docker.sock"); err == nil {
+		if stat, ok := info.Sys().(*syscall.Stat_t); ok {
+			dockerGID = strconv.FormatUint(uint64(stat.Gid), 10)
+		}
+	}
+
+	contextDir, err := os.MkdirTemp("", "devcontainer-context-")
+	if err != nil {
+		return fmt.Errorf("creating context dir: %w", err)
+	}
+	defer os.RemoveAll(contextDir)
+
+	if err := os.WriteFile(filepath.Join(contextDir, "Dockerfile"), dockerfile, 0644); err != nil {
+		return fmt.Errorf("writing Dockerfile: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(contextDir, ".dockerignore"), dockerignore, 0644); err != nil {
+		return fmt.Errorf("writing .dockerignore: %w", err)
+	}
+
+	buildArgs := []string{"build",
+		"--build-arg", "USER_UID=" + u.Uid,
+		"--build-arg", "USER_GID=" + u.Gid,
+		"--build-arg", "DOCKER_GID=" + dockerGID,
+		"-t", imageName,
+	}
+	if noCache {
+		buildArgs = append(buildArgs, "--no-cache")
+	}
+	buildArgs = append(buildArgs, contextDir)
+
+	return runCmd("docker", buildArgs...)
 }
 
 func newExecCmd() *cobra.Command {

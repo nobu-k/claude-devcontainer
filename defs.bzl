@@ -30,7 +30,7 @@ devcontainer = rule(
         "command": attr.string(
             default = "start",
             doc = "Subcommand to run (start or exec).",
-            values = ["start", "exec"],
+            values = ["start", "build", "exec"],
         ),
         "docker": attr.bool(
             default = False,

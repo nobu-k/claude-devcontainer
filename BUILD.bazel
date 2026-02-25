@@ -14,6 +14,11 @@ go_binary(
 
 devcontainer(name = "start")
 
+devcontainer(
+    name = "build",
+    command = "build",
+)
+
 go_library(
     name = "claude-devcontainer_lib",
     srcs = ["main.go"],
