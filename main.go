@@ -611,6 +611,12 @@ func run(name, vcsFlag string, docker bool, ports []string, volumes []string, re
 		dockerArgs = append(dockerArgs, "-p", p)
 	}
 	for _, v := range volumes {
+		// Resolve relative host paths against the workspace root so that
+		// Docker treats them as bind mounts instead of named volumes.
+		if parts := strings.SplitN(v, ":", 2); len(parts) >= 2 && !filepath.IsAbs(parts[0]) {
+			parts[0] = filepath.Join(workspaceDir, parts[0])
+			v = strings.Join(parts, ":")
+		}
 		dockerArgs = append(dockerArgs, "-v", v)
 	}
 	dockerArgs = append(dockerArgs, imageName)
