@@ -63,6 +63,7 @@ func newStartCmd() *cobra.Command {
 	var flagVCS string
 	var flagDocker bool
 	var flagPorts []string
+	var flagVolumes []string
 	var flagResume string
 
 	cmd := &cobra.Command{
@@ -71,7 +72,7 @@ func newStartCmd() *cobra.Command {
 		Long:  "Creates a Docker container with Claude Code and development tools, using VCS worktrees for isolation.",
 		Args:  cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(flagName, flagVCS, flagDocker, flagPorts, flagResume, args)
+			return run(flagName, flagVCS, flagDocker, flagPorts, flagVolumes, flagResume, args)
 		},
 	}
 
@@ -79,6 +80,7 @@ func newStartCmd() *cobra.Command {
 	cmd.Flags().StringVar(&flagVCS, "vcs", "", "override VCS type: git or jj (default: auto-detect)")
 	cmd.Flags().BoolVar(&flagDocker, "docker", false, "mount Docker socket into the container")
 	cmd.Flags().StringArrayVar(&flagPorts, "port", nil, "publish a container port to the host (hostPort:containerPort)")
+	cmd.Flags().StringArrayVar(&flagVolumes, "volume", nil, "additional volume mount (host:container[:options])")
 	cmd.Flags().StringVar(&flagResume, "resume", "", "resume a Claude session by ID or name")
 	cmd.Flags().Lookup("resume").NoOptDefVal = " "
 
@@ -300,7 +302,7 @@ func runExec(containerName string) error {
 	return nil
 }
 
-func run(name, vcsFlag string, docker bool, ports []string, resume string, extraArgs []string) error {
+func run(name, vcsFlag string, docker bool, ports []string, volumes []string, resume string, extraArgs []string) error {
 	if resume != "" && len(extraArgs) > 0 {
 		return fmt.Errorf("cannot combine --resume with extra command arguments")
 	}
@@ -607,6 +609,9 @@ func run(name, vcsFlag string, docker bool, ports []string, resume string, extra
 	dockerArgs = append(dockerArgs, envArgs...)
 	for _, p := range ports {
 		dockerArgs = append(dockerArgs, "-p", p)
+	}
+	for _, v := range volumes {
+		dockerArgs = append(dockerArgs, "-v", v)
 	}
 	dockerArgs = append(dockerArgs, imageName)
 	if resume != "" {

@@ -7,6 +7,8 @@ def _devcontainer_impl(ctx):
         args.append("--docker")
     for port in ctx.attr.ports:
         args.extend(["--port", port])
+    for volume in ctx.attr.volumes:
+        args.extend(["--volume", volume])
 
     ctx.actions.write(
         output = script,
@@ -39,6 +41,10 @@ devcontainer = rule(
         "ports": attr.string_list(
             default = [],
             doc = "Port mappings to publish (hostPort:containerPort).",
+        ),
+        "volumes": attr.string_list(
+            default = [],
+            doc = "Additional volume mounts to bind (host:container[:options]).",
         ),
         "_binary": attr.label(
             default = Label("//:devcontainer"),

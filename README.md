@@ -66,6 +66,9 @@ claude-devcontainer start --docker
 
 # Forward a port from the container to the host
 claude-devcontainer start --port 8080:8080
+
+# Bind-mount a host directory into the container
+claude-devcontainer start --volume /tmp:/tmp:ro
 ```
 
 #### Flags
@@ -77,6 +80,7 @@ claude-devcontainer start --port 8080:8080
 | `--vcs` | Override VCS type: `git` or `jj` (default: auto-detect from `.jj/` or `.git/`) |
 | `--docker` | Mount the Docker socket into the container |
 | `--port` | Publish a container port to the host (`hostPort:containerPort`) |
+| `--volume` | Additional volume mount (`host:container[:options]`) |
 
 ### `exec` — Attach to a running devcontainer
 
@@ -117,6 +121,7 @@ Then create a target in your `BUILD.bazel`:
 load("@claude-devcontainer//:defs.bzl", "devcontainer")
 
 devcontainer(name = "start")
+devcontainer(name = "start-with-data", volumes = ["/data:/data:ro"])
 devcontainer(name = "attach", command = "exec")
 ```
 
