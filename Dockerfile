@@ -94,9 +94,9 @@ WIDTH="${3:-1280}"
 HEIGHT="${4:-720}"
 
 node -e "
-const { chromium } = require('playwright');
+const { chromium } = require('/usr/lib/node_modules/playwright');
 (async () => {
-  const [,, url, output, width, height, fullPage, media] = process.argv;
+  const [, url, output, width, height, fullPage, media] = process.argv;
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: parseInt(width), height: parseInt(height) } });
   if (media) await page.emulateMedia({ media });
