@@ -72,6 +72,13 @@ func newStartCmd() *cobra.Command {
 		Long:  "Creates a Docker container with Claude Code and development tools, using VCS worktrees for isolation.",
 		Args:  cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// When --resume is passed without '=' (e.g. --resume ID),
+			// NoOptDefVal causes cobra to treat ID as a positional arg.
+			// Consume the first positional arg as the session ID.
+			if strings.TrimSpace(flagResume) == "" && flagResume != "" && len(args) > 0 {
+				flagResume = args[0]
+				args = args[1:]
+			}
 			return run(flagName, flagVCS, flagDocker, flagPorts, flagVolumes, flagResume, args)
 		},
 	}
