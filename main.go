@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -14,7 +15,9 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
+	"time"
 
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
@@ -549,6 +552,33 @@ func run(name, vcsFlag string, docker bool, ports []string, volumes []string, re
 		envArgs = append(envArgs, "-e", "SSH_AUTH_SOCK=/tmp/ssh-agent.sock")
 	}
 
+	// VS Code editor proxy: let Ctrl-G open a VS Code tab on the host
+	var editorListener net.Listener
+	var editorWG *sync.WaitGroup
+	if codePath, err := exec.LookPath("code"); err == nil {
+		editorDir, err := os.MkdirTemp("", "claude-editor-")
+		if err == nil {
+			editorListener, editorWG, err = startEditorProxy(editorDir, codePath)
+			if err == nil {
+				addMount(editorDir, "/tmp/claude-editor", false)
+				envArgs = append(envArgs, "-e", "VISUAL=vscode-editor")
+				fmt.Fprintf(os.Stderr, "devcontainer: editor proxy started (code=%s)\n", codePath)
+				defer func() {
+					editorListener.Close()
+					done := make(chan struct{})
+					go func() { editorWG.Wait(); close(done) }()
+					select {
+					case <-done:
+					case <-time.After(2 * time.Second):
+					}
+					os.RemoveAll(editorDir)
+				}()
+			} else {
+				os.RemoveAll(editorDir)
+			}
+		}
+	}
+
 	// Host timezone
 	if tz := detectTimezone(); tz != "" {
 		envArgs = append(envArgs, "-e", "TZ="+tz)
@@ -784,6 +814,60 @@ func isSocket(path string) bool {
 		return false
 	}
 	return info.Mode().Type() == fs.ModeSocket
+}
+
+// startEditorProxy listens on a Unix socket inside sharedDir and spawns a
+// handler goroutine for each connection.  The returned listener and WaitGroup
+// let the caller perform a graceful shutdown.
+func startEditorProxy(sharedDir, codePath string) (net.Listener, *sync.WaitGroup, error) {
+	sockPath := filepath.Join(sharedDir, "editor.sock")
+	ln, err := net.Listen("unix", sockPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("listening on %s: %w", sockPath, err)
+	}
+	// Allow container user to connect.
+	os.Chmod(sockPath, 0666)
+
+	var wg sync.WaitGroup
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return // listener closed
+			}
+			wg.Add(1)
+			go handleEditorConn(conn, sharedDir, codePath, &wg)
+		}
+	}()
+	return ln, &wg, nil
+}
+
+// handleEditorConn reads a filename from the connection, opens it in VS Code
+// on the host, then sends "done\n" when the editor closes.
+func handleEditorConn(conn net.Conn, sharedDir, codePath string, wg *sync.WaitGroup) {
+	defer wg.Done()
+	defer conn.Close()
+
+	scanner := bufio.NewScanner(conn)
+	if !scanner.Scan() {
+		return
+	}
+	filename := scanner.Text()
+
+	// Sanitize: reject path traversal
+	if strings.Contains(filename, "/") || strings.Contains(filename, "\\") || filename == ".." {
+		return
+	}
+
+	filePath := filepath.Join(sharedDir, filename)
+	cmd := exec.Command(codePath, "--wait", filePath)
+	cmd.Stdout = os.Stderr // surface VS Code output
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "devcontainer: code --wait failed: %v\n", err)
+	}
+
+	conn.Write([]byte("done\n"))
 }
 
 // detectTimezone returns the host's IANA timezone (e.g. "America/New_York").

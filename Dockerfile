@@ -107,6 +107,78 @@ const { chromium } = require('/usr/lib/node_modules/playwright');
 " "$URL" "$OUTPUT" "$WIDTH" "$HEIGHT" "$FULL_PAGE" "$MEDIA"
 SCRIPT
 
+# vscode-editor: lightweight client for the host editor proxy
+RUN cat <<'SCRIPT' > /usr/local/bin/vscode-editor && chmod +x /usr/local/bin/vscode-editor
+#!/usr/bin/env node
+'use strict';
+const fs = require('fs');
+const net = require('net');
+const path = require('path');
+const crypto = require('crypto');
+
+const SOCKET_PATH = '/tmp/claude-editor/editor.sock';
+const SHARED_DIR = '/tmp/claude-editor';
+
+const origFile = process.argv[2];
+if (!origFile) {
+  console.error('Usage: vscode-editor <file>');
+  process.exit(1);
+}
+const origPath = path.resolve(origFile);
+
+// Copy file to shared directory with a unique name
+const ext = path.extname(origPath);
+const base = path.basename(origPath, ext);
+const uniqueName = `${base}-${crypto.randomBytes(4).toString('hex')}${ext}`;
+const sharedPath = path.join(SHARED_DIR, uniqueName);
+
+try {
+  if (fs.existsSync(origPath)) {
+    fs.copyFileSync(origPath, sharedPath);
+  } else {
+    fs.writeFileSync(sharedPath, '');
+  }
+} catch (err) {
+  console.error(`Failed to copy file to shared dir: ${err.message}`);
+  process.exit(1);
+}
+
+function cleanup() {
+  try { fs.unlinkSync(sharedPath); } catch {}
+}
+process.on('SIGINT', () => { cleanup(); process.exit(130); });
+process.on('SIGTERM', () => { cleanup(); process.exit(143); });
+
+const conn = net.createConnection(SOCKET_PATH, () => {
+  conn.write(uniqueName + '\n');
+});
+
+conn.on('error', (err) => {
+  console.error(`Editor proxy connection failed: ${err.message}`);
+  cleanup();
+  process.exit(1);
+});
+
+let buf = '';
+conn.on('data', (chunk) => {
+  buf += chunk.toString();
+  if (buf.includes('done\n')) {
+    // Copy edited file back
+    try {
+      fs.copyFileSync(sharedPath, origPath);
+    } catch (err) {
+      console.error(`Failed to copy edited file back: ${err.message}`);
+    }
+    cleanup();
+    conn.end();
+  }
+});
+
+conn.on('end', () => {
+  cleanup();
+});
+SCRIPT
+
 # User setup
 RUN groupadd --gid ${USER_GID} ${USER_NAME} \
     && useradd --uid ${USER_UID} --gid ${USER_GID} -m ${USER_NAME} \
