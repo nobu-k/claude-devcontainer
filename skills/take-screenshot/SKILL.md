@@ -17,6 +17,8 @@ take-screenshot [options] <url> <output-path> [width] [height]
 
 - `--full-page` — Capture the entire scrollable page, not just the viewport
 - `--media print|screen` — Emulate a CSS media type (e.g., `print` for print stylesheets)
+- `--wait <ms>` — Wait additional milliseconds after network idle before capturing (useful for JS hydration)
+- `--wait-for <selector>` — Wait for a CSS selector to appear before capturing (e.g., `--wait-for .hydrated`)
 
 **Positional arguments:**
 
@@ -44,6 +46,7 @@ Then use the Read tool to view the resulting PNG.
 ## Tips
 
 - The page waits for `networkidle` before capturing, so dynamically loaded content should be visible.
+- For pages with client-side hydration (e.g., Vite dev SSR), use `--wait 2000` or `--wait-for .some-styled-class` to wait for JS to apply styles.
 - To capture a specific viewport size (e.g., mobile), pass width and height: `take-screenshot http://localhost:3000 /tmp/mobile.png 375 812`
 - Use `--media print` to test print stylesheets — this activates `@media print` CSS rules.
 - By default the screenshot captures the viewport only. Use `--full-page` to capture the entire page.

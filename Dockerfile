@@ -81,30 +81,36 @@ RUN cat <<'SCRIPT' > /usr/local/bin/take-screenshot && chmod +x /usr/local/bin/t
 #!/bin/bash
 FULL_PAGE=false
 MEDIA=""
+WAIT_MS=""
+WAIT_FOR=""
 while [[ "$1" == --* ]]; do
   case "$1" in
     --full-page) FULL_PAGE=true; shift ;;
     --media) MEDIA="$2"; shift 2 ;;
+    --wait) WAIT_MS="$2"; shift 2 ;;
+    --wait-for) WAIT_FOR="$2"; shift 2 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
-URL="${1:?Usage: take-screenshot [--full-page] [--media print|screen] <url> <output-path> [width] [height]}"
-OUTPUT="${2:?Usage: take-screenshot [--full-page] [--media print|screen] <url> <output-path> [width] [height]}"
+URL="${1:?Usage: take-screenshot [options] <url> <output-path> [width] [height]}"
+OUTPUT="${2:?Usage: take-screenshot [options] <url> <output-path> [width] [height]}"
 WIDTH="${3:-1280}"
 HEIGHT="${4:-720}"
 
 node -e "
 const { chromium } = require('/usr/lib/node_modules/playwright');
 (async () => {
-  const [, url, output, width, height, fullPage, media] = process.argv;
+  const [, url, output, width, height, fullPage, media, waitMs, waitFor] = process.argv;
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: parseInt(width), height: parseInt(height) } });
   if (media) await page.emulateMedia({ media });
   await page.goto(url, { waitUntil: 'networkidle' });
+  if (waitFor) await page.waitForSelector(waitFor, { timeout: 30000 });
+  if (waitMs) await new Promise(r => setTimeout(r, parseInt(waitMs)));
   await page.screenshot({ path: output, fullPage: fullPage === 'true' });
   await browser.close();
 })();
-" "$URL" "$OUTPUT" "$WIDTH" "$HEIGHT" "$FULL_PAGE" "$MEDIA"
+" "$URL" "$OUTPUT" "$WIDTH" "$HEIGHT" "$FULL_PAGE" "$MEDIA" "$WAIT_MS" "$WAIT_FOR"
 SCRIPT
 
 # vscode-editor: lightweight client for the host editor proxy
