@@ -68,13 +68,15 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     && apt-get install -y --no-install-recommends gh \
     && rm -rf /var/lib/apt/lists/*
 
-# Claude CLI
-RUN npm install -g @anthropic-ai/claude-code
-
 # Playwright + headless Chromium for visual inspection
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
 RUN npm install -g playwright && playwright install chromium --with-deps \
     && rm -rf /var/lib/apt/lists/*
+
+# Claude CLI — the ADD re-fetches version metadata each build and
+# invalidates this layer whenever a new release is published
+ADD https://registry.npmjs.org/@anthropic-ai/claude-code/latest /tmp/claude-code-latest.json
+RUN npm install -g @anthropic-ai/claude-code
 
 # take-screenshot helper
 RUN cat <<'SCRIPT' > /usr/local/bin/take-screenshot && chmod +x /usr/local/bin/take-screenshot
